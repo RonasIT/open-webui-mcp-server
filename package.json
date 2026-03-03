@@ -1,0 +1,51 @@
+{
+  "name": "@ronas-it/your-package-name",
+  "version": "0.0.0",
+  "description": "Your package description",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup-node",
+    "release": "npm publish",
+    "lint": "npx tsc && npx eslint ./",
+    "format": "npx prettier --write . && npm run lint -- --fix",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RonasIT/your-package-name.git"
+  },
+  "keywords": [],
+  "author": "Ronas IT",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RonasIT/your-package-name/issues"
+  },
+  "homepage": "https://github.com/RonasIT/your-package-name#readme",
+  "devDependencies": {
+    "@eslint/compat": "^1.2.5",
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.18.0",
+    "@stylistic/eslint-plugin": "^2.13.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.1",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "lint-staged": {
+    "*.{js,ts}": "eslint --cache --fix",
+    "*.{js,ts,css,md}": "prettier --write"
+  },
+  "dependencies": {}
+}
