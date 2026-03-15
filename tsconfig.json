@@ -4,16 +4,17 @@
     "allowJs": true,
     "esModuleInterop": true,
     "lib": ["DOM", "ESNext"],
-    "moduleResolution": "node",
+    "types": ["node"],
+    "moduleResolution": "bundler",
+    "module": "ESNext",
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ESNext",
     "strict": true,
     "allowSyntheticDefaultImports": true,
-    "experimentalDecorators": true,
     "noImplicitAny": true,
-    "strictPropertyInitialization": false,
     "strictNullChecks": true
-  }
+  },
+  "include": ["src", "test", "*.config.ts", "vitest.e2e.config.ts"]
 }
