@@ -13,3 +13,4 @@ web-build/
 .vscode
 .idea
 .tmp
+.env
