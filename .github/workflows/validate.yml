@@ -33,7 +33,7 @@ jobs:
         run: npm test --if-present
 
       - name: Run e2e tests
-        if: ${{ vars.OPEN_WEBUI_API_URL != '' && secrets.OPEN_WEBUI_API_TOKEN != '' }}
+        if: ${{ secrets.OPEN_WEBUI_API_URL != '' && secrets.OPEN_WEBUI_API_TOKEN != '' }}
         env:
           OPEN_WEBUI_API_URL: ${{ secrets.OPEN_WEBUI_API_URL }}
           OPEN_WEBUI_API_TOKEN: ${{ secrets.OPEN_WEBUI_API_TOKEN }}
