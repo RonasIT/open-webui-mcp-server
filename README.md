@@ -9,7 +9,7 @@
 
 **MCP server for Open WebUI Knowledge Bases** – Search and access your knowledge bases from Cursor, Claude Desktop, and other MCP clients
 
-[Features](#features) • [Quick Start](#quick-start) • [Usage](#usage) • [Available Tools](#available-tools) • [Contributing](CONTRIBUTING.md)
+[Features](#features) • [Quick Start](#quick-start) • [Usage](#usage) • [Available Tools](#available-tools) • [Instructing AI](#instructing-ai-to-use-knowledge-bases) • [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -123,6 +123,22 @@ Edit `~/.cursor/mcp.json`:
 
 - **`get_knowledge_base_info`** – Get detailed information about a knowledge base
   - `knowledge_base_id` (required): The ID of the knowledge base
+
+## Instructing AI to use knowledge bases
+
+After the MCP server is configured in Cursor or Claude Desktop, the assistant can call the tools but may not know **when** to use them or **which** knowledge base to query. You can give it explicit instructions so it prefers your knowledge bases for internal docs, standards, and architecture.
+
+1. **Use the provided template**
+   Copy [AGENTS-template.md](AGENTS-template.md) into a place your AI reads:
+   - **Cursor:** Copy to `AGENTS.md` in the project root, or add its contents to `.cursor/rules` or project rules in Cursor settings.
+   - **Claude Desktop / other clients:** Paste the instructions into your custom instructions or system prompt.
+
+2. **Customize the template**
+   - Adjust the “When to query” section to match your domains (e.g. which base to use for frontend, backend, sales).
+   - Describe other keywords/conditions to instruct AI to call your knowledge bases via MCP.
+
+3. **Keep it updated**
+   The template tells the AI to call **list_knowledge_bases** when unsure and to update the table when bases change, so the reference stays accurate.
 
 ## Environment Variables
 
