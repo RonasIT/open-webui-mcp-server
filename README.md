@@ -125,17 +125,13 @@ claude mcp add open-webui-knowledge --scope user \
 
 ### Verify the connection
 
-1. Start Claude Code:
+Start Claude Code and check that the MCP server is running:
 
-   ```bash
-   claude
-   ```
+```bash
+/mcp
+```
 
-2. Check that the MCP server is running:
-   ```bash
-   /mcp
-   ```
-   You should see `open-webui-knowledge` listed with a green status indicator.
+You should see `open-webui-knowledge` listed with a green status indicator.
 
 ### Uninstall
 
