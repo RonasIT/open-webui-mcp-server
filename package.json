@@ -1,6 +1,6 @@
 {
   "name": "open-webui-knowledge-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP Server for Open WebUI Knowledge Bases – search and access knowledge bases from Cursor, Claude Desktop, and other MCP clients",
   "type": "module",
   "main": "./dist/index.js",
