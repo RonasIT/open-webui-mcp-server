@@ -112,6 +112,35 @@ Edit `~/.cursor/mcp.json`:
 }
 ```
 
+## Configuring Claude Code to use your MCP server
+
+### Installation
+
+```bash
+claude mcp add open-webui-knowledge --scope user \
+  -e OPEN_WEBUI_API_URL=https://your-open-webui-instance.com/api/v1 \
+  -e OPEN_WEBUI_API_TOKEN=sk-your-token-here \
+  -- npx -y open-webui-knowledge-mcp-server
+```
+
+### Verify the connection
+
+Start Claude Code and check that the MCP server is running:
+
+```bash
+/mcp
+```
+
+You should see `open-webui-knowledge` listed with a green status indicator.
+
+### Uninstall
+
+To remove the MCP server from Claude Code:
+
+```bash
+claude mcp remove open-webui-knowledge
+```
+
 ## Available Tools
 
 - **`list_knowledge_bases`** – List all accessible knowledge bases
