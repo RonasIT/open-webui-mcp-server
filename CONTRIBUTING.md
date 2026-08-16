@@ -73,7 +73,7 @@ open-webui-mcp-server-ts/
 │   ├── constants.ts        # Shared constants
 │   ├── index.ts            # Package entry
 │   ├── server.ts           # MCP server and connection management
-│   ├── tool-handlers.ts    # Tool implementations (list, search, get info)
+│   ├── tool-handlers.ts    # Tool implementations (list, search, get info, get file)
 │   └── transport-http.ts   # HTTP transport (Hono)
 ├── test/
 │   ├── api-client.test.ts
@@ -146,7 +146,7 @@ Unit tests with mocked HTTP. They cover:
 
 - API client (validation, token masking, error handling)
 - Server connection management (tokens, clients, cleanup)
-- Tool handlers (list, search, get info) with mocked responses
+- Tool handlers (list, search, get info, get file) with mocked responses
 - Error cases (401, 404, missing params)
 
 **No external dependencies required** – all HTTP is mocked.
@@ -162,7 +162,7 @@ npm test
 E2e tests run against a real Open WebUI API. They cover:
 
 - List knowledge bases, get client, cleanup
-- Search and get_knowledge_base_info (validation and real API)
+- Search, get_knowledge_base_info and get_knowledge_base_file (validation and real API)
 - Authentication (invalid/missing token)
 - Full workflow
 

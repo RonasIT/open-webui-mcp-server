@@ -153,6 +153,12 @@ claude mcp remove open-webui-knowledge
 - **`get_knowledge_base_info`** – Get detailed information about a knowledge base
   - `knowledge_base_id` (required): The ID of the knowledge base
 
+- **`get_knowledge_base_file`** – Read the text content of a file
+  - `file_id` (required): The ID of the file, as returned by `get_knowledge_base_info` or `search_knowledge_base`
+  - `max_length` (optional): Number of characters to return (default: 100000)
+
+Reads performed by `get_knowledge_base_file` use the caller token and are not restricted to files that belong to a knowledge base.
+
 ## Instructing AI to use knowledge bases
 
 After the MCP server is configured in Cursor or Claude Desktop, the assistant can call the tools but may not know **when** to use them or **which** knowledge base to query. You can give it explicit instructions so it prefers your knowledge bases for internal docs, standards, and architecture.

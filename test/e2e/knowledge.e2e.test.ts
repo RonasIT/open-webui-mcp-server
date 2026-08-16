@@ -2,7 +2,12 @@ import { resolve } from 'node:path';
 import { config } from 'dotenv';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { KnowledgeServer } from '../../src/server.js';
-import { listKnowledgeBases, searchKnowledgeBase, getKnowledgeBaseInfo } from '../../src/tool-handlers.js';
+import {
+  listKnowledgeBases,
+  searchKnowledgeBase,
+  getKnowledgeBaseInfo,
+  getKnowledgeBaseFile,
+} from '../../src/tool-handlers.js';
 
 config({ path: resolve(process.cwd(), '.env') });
 
@@ -147,6 +152,95 @@ describe.skipIf(!hasE2eEnv)('e2e: Open WebUI Knowledge API', () => {
             { ...ctx, connectionId, cleanup: (id) => server.cleanupConnection(id) },
           ),
         ).rejects.toThrow(/not found|Authentication/);
+      } finally {
+        await server.cleanupConnection(connectionId);
+      }
+    });
+  });
+
+  describe('get_knowledge_base_file', () => {
+    it('requires file_id', async () => {
+      const connectionId = server.getConnectionId();
+      server.connectionTokens.set(connectionId, OPEN_WEBUI_API_TOKEN!);
+      const client = await server.getClientForConnection(connectionId);
+
+      try {
+        await expect(getKnowledgeBaseFile(client, {} as { file_id: string }, ctx)).rejects.toThrow(
+          'file_id is required',
+        );
+      } finally {
+        await server.cleanupConnection(connectionId);
+      }
+    });
+
+    it('returns error for non-existent file', async () => {
+      const connectionId = server.getConnectionId();
+      server.connectionTokens.set(connectionId, OPEN_WEBUI_API_TOKEN!);
+      const client = await server.getClientForConnection(connectionId);
+
+      try {
+        await expect(
+          getKnowledgeBaseFile(
+            client,
+            { file_id: 'non-existent-file-id-12345' },
+            {
+              ...ctx,
+              connectionId,
+              cleanup: (id) => server.cleanupConnection(id),
+            },
+          ),
+        ).rejects.toThrow(/not found|Authentication|error occurred/i);
+      } finally {
+        await server.cleanupConnection(connectionId);
+      }
+    });
+
+    it('reads a real file when a knowledge base has one', async (t) => {
+      const connectionId = server.getConnectionId();
+      server.connectionTokens.set(connectionId, OPEN_WEBUI_API_TOKEN!);
+      const client = await server.getClientForConnection(connectionId);
+
+      try {
+        const kbRes = await client.get('/knowledge/');
+
+        if (!kbRes.ok) {
+          t.skip();
+
+          return;
+        }
+        const kbData = (await kbRes.json()) as { items?: Array<{ id: string }> } | Array<{ id: string }>;
+        const kbList = Array.isArray(kbData) ? kbData : (kbData.items ?? []);
+        let fileId: string | undefined;
+
+        for (const kb of kbList) {
+          const fr = await client.get(`/knowledge/${kb.id}/files?page=1`);
+          if (!fr.ok) continue;
+          const fd = (await fr.json()) as { items?: Array<{ id: string }> } | Array<{ id: string }>;
+          const files = Array.isArray(fd) ? fd : (fd.items ?? []);
+
+          if (files.length > 0) {
+            fileId = files[0]!.id;
+            break;
+          }
+        }
+
+        if (!fileId) {
+          t.skip();
+
+          return;
+        }
+        const result = await getKnowledgeBaseFile(
+          client,
+          { file_id: fileId },
+          {
+            ...ctx,
+            connectionId,
+            cleanup: (id) => server.cleanupConnection(id),
+          },
+        );
+        expect(result).toHaveLength(1);
+        expect(result[0]!.type).toBe('text');
+        expect(result[0]!.text).toContain(`File ID: ${fileId}`);
       } finally {
         await server.cleanupConnection(connectionId);
       }

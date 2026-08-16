@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { listKnowledgeBases, searchKnowledgeBase, getKnowledgeBaseInfo } from '../src/tool-handlers.js';
+import { MAX_FILE_CONTENT_LENGTH } from '../src/constants.js';
+import {
+  listKnowledgeBases,
+  searchKnowledgeBase,
+  getKnowledgeBaseInfo,
+  getKnowledgeBaseFile,
+} from '../src/tool-handlers.js';
 import type { ApiClient } from '../src/api-client.js';
 
 function mockRes<T>(data: T, ok = true, status = 200) {
@@ -189,5 +195,108 @@ describe('getKnowledgeBaseInfo', () => {
     await expect(getKnowledgeBaseInfo(client, { knowledge_base_id: 'kb-1' }, ctx)).rejects.toThrow(
       'Authentication failed',
     );
+  });
+});
+
+describe('getKnowledgeBaseFile', () => {
+  it('returns file content with name and length', async () => {
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(
+        mockRes({
+          id: 'file-1',
+          filename: 'architecture.md',
+          meta: { name: 'architecture.md' },
+          data: { content: '# Architecture\n\nSome content.' },
+        }),
+      ),
+      post: vi.fn(),
+    };
+    const result = await getKnowledgeBaseFile(client, { file_id: 'file-1' }, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.text).toContain('File: architecture.md');
+    expect(result[0]!.text).toContain('# Architecture');
+    expect(client.get).toHaveBeenCalledWith('/files/file-1');
+  });
+
+  it('truncates content longer than max_length', async () => {
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(mockRes({ filename: 'big.md', data: { content: 'x'.repeat(50) } })),
+      post: vi.fn(),
+    };
+    const result = await getKnowledgeBaseFile(client, { file_id: 'file-1', max_length: 10 }, ctx);
+    expect(result[0]!.text).toContain('truncated to 10');
+    expect(result[0]!.text).toContain('Increase max_length');
+    const body = result[0]!.text.split('\n\n')[1];
+    expect(body).toBe('x'.repeat(10));
+  });
+
+  it('reports the server limit when max_length is already at the ceiling', async () => {
+    const client: ApiClient = {
+      get: vi
+        .fn()
+        .mockResolvedValue(
+          mockRes({ filename: 'huge.md', data: { content: 'x'.repeat(MAX_FILE_CONTENT_LENGTH + 25) } }),
+        ),
+      post: vi.fn(),
+    };
+    const result = await getKnowledgeBaseFile(client, { file_id: 'file-1' }, ctx);
+    expect(result[0]!.text).toContain(`server limit of ${MAX_FILE_CONTENT_LENGTH} characters`);
+    expect(result[0]!.text).toContain('25 characters were not returned');
+    expect(result[0]!.text).not.toContain('Increase max_length');
+  });
+
+  it('reports files without extractable text', async () => {
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(mockRes({ filename: 'image.png', data: {} })),
+      post: vi.fn(),
+    };
+    const result = await getKnowledgeBaseFile(client, { file_id: 'file-1' }, ctx);
+    expect(result[0]!.text).toContain('no extractable text content');
+  });
+
+  it('throws when file_id is missing', async () => {
+    const client: ApiClient = { get: vi.fn(), post: vi.fn() };
+    await expect(getKnowledgeBaseFile(client, {} as { file_id: string }, ctx)).rejects.toThrow('file_id is required');
+  });
+
+  it('throws when file_id contains invalid characters', async () => {
+    const client: ApiClient = { get: vi.fn(), post: vi.fn() };
+    await expect(getKnowledgeBaseFile(client, { file_id: '../../etc/passwd' }, ctx)).rejects.toThrow(
+      'file_id contains invalid characters',
+    );
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  it('throws when max_length is out of range or not an integer', async () => {
+    const client: ApiClient = { get: vi.fn(), post: vi.fn() };
+    await expect(getKnowledgeBaseFile(client, { file_id: 'file-1', max_length: 0 }, ctx)).rejects.toThrow(
+      'max_length must be an integer',
+    );
+    await expect(getKnowledgeBaseFile(client, { file_id: 'file-1', max_length: 1.5 }, ctx)).rejects.toThrow(
+      'max_length must be an integer',
+    );
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  it('throws on 404', async () => {
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(mockRes({}, false, 404)),
+      post: vi.fn(),
+    };
+    await expect(getKnowledgeBaseFile(client, { file_id: 'file-nonexistent' }, ctx)).rejects.toThrow(
+      'File not found: file-nonexistent',
+    );
+  });
+
+  it('throws on 401 and calls cleanup', async () => {
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(mockRes({}, false, 401)),
+      post: vi.fn(),
+    };
+    await expect(
+      getKnowledgeBaseFile(client, { file_id: 'file-1' }, { connectionId: 'conn_401', cleanup }),
+    ).rejects.toThrow('Authentication failed');
+    expect(cleanup).toHaveBeenCalledWith('conn_401');
   });
 });

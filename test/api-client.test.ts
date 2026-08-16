@@ -3,10 +3,12 @@ import {
   validateToken,
   maskToken,
   validateKnowledgeBaseId,
+  validateFileId,
   validateQuery,
   sanitizeErrorMessage,
   createApiClient,
 } from '../src/api-client.js';
+import { MAX_FILE_ID_LENGTH } from '../src/constants.js';
 
 describe('validateToken', () => {
   it('accepts sk- prefix tokens', () => {
@@ -53,6 +55,24 @@ describe('validateKnowledgeBaseId', () => {
     expect(() => validateKnowledgeBaseId('')).toThrow('non-empty string');
     expect(() => validateKnowledgeBaseId('   ')).toThrow();
     expect(() => validateKnowledgeBaseId('invalid id!')).toThrow('invalid characters');
+  });
+});
+
+describe('validateFileId', () => {
+  it('accepts valid ids', () => {
+    expect(() => validateFileId('file-1')).not.toThrow();
+    expect(() => validateFileId('0e6cec32_3a09')).not.toThrow();
+  });
+
+  it('rejects empty or invalid', () => {
+    expect(() => validateFileId('')).toThrow('non-empty string');
+    expect(() => validateFileId('   ')).toThrow('non-empty string');
+    expect(() => validateFileId('../../etc/passwd')).toThrow('invalid characters');
+  });
+
+  it('rejects ids longer than the limit', () => {
+    expect(() => validateFileId('a'.repeat(MAX_FILE_ID_LENGTH))).not.toThrow();
+    expect(() => validateFileId('a'.repeat(MAX_FILE_ID_LENGTH + 1))).toThrow('exceeds maximum length');
   });
 });
 

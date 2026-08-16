@@ -1,4 +1,11 @@
-import { ALLOWED_KB_ID_PATTERN, MAX_KB_ID_LENGTH, MAX_QUERY_LENGTH, TOKEN_MASK_LENGTH } from './constants.js';
+import {
+  ALLOWED_FILE_ID_PATTERN,
+  ALLOWED_KB_ID_PATTERN,
+  MAX_FILE_ID_LENGTH,
+  MAX_KB_ID_LENGTH,
+  MAX_QUERY_LENGTH,
+  TOKEN_MASK_LENGTH,
+} from './constants.js';
 
 export function validateToken(token: string | null | undefined): boolean {
   if (token == null || typeof token !== 'string') return false;
@@ -26,6 +33,14 @@ export function validateKnowledgeBaseId(kbId: string): void {
   if (id.length === 0) throw new Error('knowledge_base_id must be a non-empty string');
   if (id.length > MAX_KB_ID_LENGTH) throw new Error(`knowledge_base_id exceeds maximum length of ${MAX_KB_ID_LENGTH}`);
   if (!ALLOWED_KB_ID_PATTERN.test(id)) throw new Error('knowledge_base_id contains invalid characters');
+}
+
+export function validateFileId(fileId: string): void {
+  if (fileId == null || typeof fileId !== 'string') throw new Error('file_id must be a non-empty string');
+  const id = fileId.trim();
+  if (id.length === 0) throw new Error('file_id must be a non-empty string');
+  if (id.length > MAX_FILE_ID_LENGTH) throw new Error(`file_id exceeds maximum length of ${MAX_FILE_ID_LENGTH}`);
+  if (!ALLOWED_FILE_ID_PATTERN.test(id)) throw new Error('file_id contains invalid characters');
 }
 
 export function validateQuery(query: string): void {

@@ -1,4 +1,5 @@
-import { handleHttpError, validateKnowledgeBaseId, validateQuery } from './api-client.js';
+import { handleHttpError, validateFileId, validateKnowledgeBaseId, validateQuery } from './api-client.js';
+import { MAX_FILE_CONTENT_LENGTH } from './constants.js';
 import type { ApiClient } from './api-client.js';
 
 export type ToolContent = Array<{ type: 'text'; text: string }>;
@@ -137,4 +138,39 @@ export async function getKnowledgeBaseInfo(
   }
 
   return [{ type: 'text', text: JSON.stringify(kbData, null, 2) }];
+}
+
+export type GetFileArgs = { file_id: string; max_length?: number };
+
+export async function getKnowledgeBaseFile(
+  client: ApiClient,
+  args: GetFileArgs,
+  ctx: HttpErrorContext,
+): Promise<ToolContent> {
+  const { file_id: fileId, max_length: maxLength = MAX_FILE_CONTENT_LENGTH } = args;
+  if (!fileId) throw new Error('file_id is required');
+  validateFileId(fileId);
+  if (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > MAX_FILE_CONTENT_LENGTH)
+    throw new Error(`max_length must be an integer between 1 and ${MAX_FILE_CONTENT_LENGTH}`);
+  const res = await client.get(`/files/${fileId}`);
+  if (res.status === 404) throw new Error(`File not found: ${fileId}`);
+  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup);
+  const fileData = (await res.json()) as {
+    filename?: string;
+    meta?: { name?: string };
+    data?: { content?: string };
+  };
+  const fileName = fileData.meta?.name ?? fileData.filename ?? fileId;
+  const content = fileData.data?.content ?? '';
+  if (content.length === 0) return [{ type: 'text', text: `File '${fileName}' has no extractable text content.\n` }];
+  const isTruncated = content.length > maxLength;
+  let text = `File: ${fileName}\nFile ID: ${fileId}\nLength: ${content.length} characters`;
+  if (isTruncated) text += ` (truncated to ${maxLength})`;
+  text += `\n\n${isTruncated ? content.slice(0, maxLength) : content}\n`;
+  if (isTruncated && maxLength >= MAX_FILE_CONTENT_LENGTH)
+    text += `\n[Content truncated at the server limit of ${MAX_FILE_CONTENT_LENGTH} characters. ${content.length - maxLength} characters were not returned.]\n`;
+  if (isTruncated && maxLength < MAX_FILE_CONTENT_LENGTH)
+    text += `\n[Content truncated. Increase max_length to read up to ${MAX_FILE_CONTENT_LENGTH} characters.]\n`;
+
+  return [{ type: 'text', text }];
 }

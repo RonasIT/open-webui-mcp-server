@@ -2,6 +2,9 @@ export const MAX_REQUEST_SIZE = 10 * 1024 * 1024;
 export const MAX_QUERY_LENGTH = 10_000;
 export const MAX_KB_ID_LENGTH = 255;
 export const ALLOWED_KB_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+export const MAX_FILE_ID_LENGTH = 255;
+export const ALLOWED_FILE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+export const MAX_FILE_CONTENT_LENGTH = 100_000;
 
 export const DEFAULT_RATE_LIMIT_PER_IP = '1000/minute';
 export const DEFAULT_RATE_LIMIT_PER_TOKEN = '1000/minute';

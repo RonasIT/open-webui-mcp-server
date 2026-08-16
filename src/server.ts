@@ -2,8 +2,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createApiClient, handleHttpError, validateKnowledgeBaseId, validateToken } from './api-client.js';
-import { CONNECTION_ID_PREFIX_STDIO } from './constants.js';
-import { getKnowledgeBaseInfo, listKnowledgeBases, searchKnowledgeBase } from './tool-handlers.js';
+import { CONNECTION_ID_PREFIX_STDIO, MAX_FILE_CONTENT_LENGTH } from './constants.js';
+import {
+  getKnowledgeBaseFile,
+  getKnowledgeBaseInfo,
+  listKnowledgeBases,
+  searchKnowledgeBase,
+} from './tool-handlers.js';
 import type { ApiClient } from './api-client.js';
 
 const requestContext = new AsyncLocalStorage<{
@@ -219,6 +224,51 @@ export class KnowledgeServer {
           };
         }
         const content = await getKnowledgeBaseInfo(client, args as { knowledge_base_id: string }, {
+          connectionId,
+          cleanup: (id) => this.cleanupConnection(id),
+        });
+
+        return { content };
+      },
+    );
+
+    mcpServer.registerTool(
+      'get_knowledge_base_file',
+      {
+        description:
+          'Read the text content of a file via Open WebUI API. Reads are not restricted to files that belong to a knowledge base',
+        inputSchema: z.object({
+          file_id: z
+            .string()
+            .describe('The ID of the file to read, as returned by get_knowledge_base_info or search_knowledge_base'),
+          max_length: z
+            .number()
+            .int()
+            .min(1)
+            .max(MAX_FILE_CONTENT_LENGTH)
+            .default(MAX_FILE_CONTENT_LENGTH)
+            .describe(`Number of characters to return (default: ${MAX_FILE_CONTENT_LENGTH})`),
+        }),
+      },
+      async (args): Promise<{ content: Array<{ type: 'text'; text: string }> }> => {
+        const connectionId = getConnectionId();
+        let client: ApiClient;
+
+        try {
+          client = await this.getClientForConnection(connectionId);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Authentication Error: ${msg}\n\nTo use this MCP server, set the OPEN_WEBUI_API_TOKEN environment variable with your Open WebUI API token (starts with 'sk-').`,
+              },
+            ],
+          };
+        }
+        const content = await getKnowledgeBaseFile(client, args as { file_id: string; max_length?: number }, {
           connectionId,
           cleanup: (id) => this.cleanupConnection(id),
         });
