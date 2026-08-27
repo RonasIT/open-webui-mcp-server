@@ -5,6 +5,8 @@ import {
   validateKnowledgeBaseId,
   validateQuery,
   sanitizeErrorMessage,
+  parseApiErrorDetail,
+  formatHttpErrorMessage,
   createApiClient,
 } from '../src/api-client.js';
 
@@ -68,16 +70,43 @@ describe('validateQuery', () => {
 });
 
 describe('sanitizeErrorMessage', () => {
-  it('sanitizes HTTP error text', () => {
-    expect(sanitizeErrorMessage('HTTP error 500')).toBe(
-      'An error occurred while processing the request. Please try again.',
-    );
+  it('appends guidance for fallback HTTP errors', () => {
+    expect(sanitizeErrorMessage('HTTP error 500')).toContain('HTTP error 500');
+    expect(sanitizeErrorMessage('HTTP error 500')).toContain('Open WebUI server logs');
   });
 
   it('truncates long messages', () => {
     const long = 'x'.repeat(600);
     expect(sanitizeErrorMessage(long).length).toBe(503);
     expect(sanitizeErrorMessage(long).endsWith('...')).toBe(true);
+  });
+});
+
+describe('parseApiErrorDetail', () => {
+  it('extracts detail string from JSON body', async () => {
+    const res = {
+      text: async () => JSON.stringify({ detail: 'Embedding model is not configured' }),
+    } as Response;
+
+    await expect(parseApiErrorDetail(res)).resolves.toBe('Embedding model is not configured');
+  });
+
+  it('extracts validation error messages from JSON body', async () => {
+    const res = {
+      text: async () => JSON.stringify({ detail: [{ msg: 'field required' }] }),
+    } as Response;
+
+    await expect(parseApiErrorDetail(res)).resolves.toBe('field required');
+  });
+});
+
+describe('formatHttpErrorMessage', () => {
+  it('adds search-specific guidance for retrieval failures', () => {
+    const message = formatHttpErrorMessage(400, 'Error querying knowledge base', { operation: 'search' });
+
+    expect(message).toContain('Semantic search failed (HTTP 400)');
+    expect(message).toContain('embedding or retrieval configuration');
+    expect(message).toContain('get_knowledge_base_file_content');
   });
 });
 

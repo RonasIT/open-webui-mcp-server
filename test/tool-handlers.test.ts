@@ -1,13 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { listKnowledgeBases, searchKnowledgeBase, getKnowledgeBaseInfo } from '../src/tool-handlers.js';
+import {
+  listKnowledgeBases,
+  searchKnowledgeBase,
+  getKnowledgeBaseInfo,
+  getKnowledgeBaseFileContent,
+} from '../src/tool-handlers.js';
 import type { ApiClient } from '../src/api-client.js';
 
 function mockRes<T>(data: T, ok = true, status = 200) {
   return {
     ok,
     status,
+    headers: new Headers(),
     json: async () => data,
-    text: async () => JSON.stringify(data),
+    text: async () => (typeof data === 'string' ? data : JSON.stringify(data)),
   };
 }
 
@@ -128,13 +134,30 @@ describe('searchKnowledgeBase', () => {
     expect(noopCleanup).toHaveBeenCalledWith('test_conn');
   });
 
-  it('throws on 404 with knowledge base not found', async () => {
+  it('throws actionable message on 404 during search', async () => {
     const client: ApiClient = {
       get: vi.fn(),
-      post: vi.fn().mockResolvedValue(mockRes({}, false, 404)),
+      post: vi.fn().mockResolvedValue(mockRes({ detail: 'Not found' }, false, 404)),
     };
     await expect(searchKnowledgeBase(client, { knowledge_base_id: 'kb-nonexistent', query: 'q' }, ctx)).rejects.toThrow(
-      'Knowledge base not found',
+      /Semantic search failed \(HTTP 404\)/,
+    );
+  });
+
+  it('throws actionable message on search API failure', async () => {
+    const client: ApiClient = {
+      get: vi.fn(),
+      post: vi
+        .fn()
+        .mockResolvedValue(
+          mockRes({ detail: 'Error querying knowledge base: embedding function unavailable' }, false, 400),
+        ),
+    };
+    await expect(searchKnowledgeBase(client, { knowledge_base_id: 'kb-1', query: 'q' }, ctx)).rejects.toThrow(
+      /Semantic search failed \(HTTP 400\): Error querying knowledge base/,
+    );
+    await expect(searchKnowledgeBase(client, { knowledge_base_id: 'kb-1', query: 'q' }, ctx)).rejects.toThrow(
+      /get_knowledge_base_file_content/,
     );
   });
 
@@ -188,6 +211,40 @@ describe('getKnowledgeBaseInfo', () => {
     };
     await expect(getKnowledgeBaseInfo(client, { knowledge_base_id: 'kb-1' }, ctx)).rejects.toThrow(
       'Authentication failed',
+    );
+  });
+});
+
+describe('getKnowledgeBaseFileContent', () => {
+  it('returns file content on success', async () => {
+    const response = mockRes('# Architecture\n\nSome content', true, 200);
+    response.headers.set('content-type', 'text/markdown');
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(response),
+      post: vi.fn(),
+    };
+
+    const result = await getKnowledgeBaseFileContent(client, { file_id: 'file-1' }, ctx);
+    expect(result[0]!.text).toContain('File ID: file-1');
+    expect(result[0]!.text).toContain('text/markdown');
+    expect(result[0]!.text).toContain('# Architecture');
+    expect(client.get).toHaveBeenCalledWith('/files/file-1/content');
+  });
+
+  it('throws when file_id is missing', async () => {
+    const client: ApiClient = { get: vi.fn(), post: vi.fn() };
+    await expect(getKnowledgeBaseFileContent(client, {} as { file_id: string }, ctx)).rejects.toThrow(
+      'file_id is required',
+    );
+  });
+
+  it('throws on 404 with file not found', async () => {
+    const client: ApiClient = {
+      get: vi.fn().mockResolvedValue(mockRes({ detail: 'Not found' }, false, 404)),
+      post: vi.fn(),
+    };
+    await expect(getKnowledgeBaseFileContent(client, { file_id: 'missing-file' }, ctx)).rejects.toThrow(
+      'File not found: missing-file',
     );
   });
 });
