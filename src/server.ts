@@ -3,7 +3,12 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { z } from 'zod';
 import { createApiClient, handleHttpError, validateKnowledgeBaseId, validateToken } from './api-client.js';
 import { CONNECTION_ID_PREFIX_STDIO } from './constants.js';
-import { getKnowledgeBaseInfo, listKnowledgeBases, searchKnowledgeBase } from './tool-handlers.js';
+import {
+  getKnowledgeBaseFileContent,
+  getKnowledgeBaseInfo,
+  listKnowledgeBases,
+  searchKnowledgeBase,
+} from './tool-handlers.js';
 import type { ApiClient } from './api-client.js';
 
 const requestContext = new AsyncLocalStorage<{
@@ -227,6 +232,41 @@ export class KnowledgeServer {
       },
     );
 
+    mcpServer.registerTool(
+      'get_knowledge_base_file_content',
+      {
+        description: 'Read the full text content of a file from a knowledge base via Open WebUI API',
+        inputSchema: z.object({
+          file_id: z.string().describe('The ID of the file (from get_knowledge_base_info files list)'),
+        }),
+      },
+      async (args): Promise<{ content: Array<{ type: 'text'; text: string }> }> => {
+        const connectionId = getConnectionId();
+        let client: ApiClient;
+
+        try {
+          client = await this.getClientForConnection(connectionId);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Authentication Error: ${msg}\n\nTo use this MCP server, set the OPEN_WEBUI_API_TOKEN environment variable with your Open WebUI API token (starts with 'sk-').`,
+              },
+            ],
+          };
+        }
+        const content = await getKnowledgeBaseFileContent(client, args as { file_id: string }, {
+          connectionId,
+          cleanup: (id) => this.cleanupConnection(id),
+        });
+
+        return { content };
+      },
+    );
+
     mcpServer.registerResource(
       'knowledge-bases',
       new ResourceTemplate('knowledge://{kbId}', {
@@ -285,7 +325,8 @@ export class KnowledgeServer {
         if (typeof kbId !== 'string') throw new Error('Invalid knowledge base ID');
         validateKnowledgeBaseId(kbId);
         const res = await client.get(`/knowledge/${kbId}`);
-        if (!res.ok) await handleHttpError(res, connectionId, (id) => this.cleanupConnection(id), kbId);
+        if (!res.ok)
+          await handleHttpError(res, connectionId, (id) => this.cleanupConnection(id), { kbId, operation: 'info' });
         const kbData = (await res.json()) as Record<string, unknown>;
 
         try {

@@ -1,4 +1,10 @@
-import { ALLOWED_KB_ID_PATTERN, MAX_KB_ID_LENGTH, MAX_QUERY_LENGTH, TOKEN_MASK_LENGTH } from './constants.js';
+import {
+  ALLOWED_KB_ID_PATTERN,
+  MAX_ERROR_MESSAGE_LENGTH,
+  MAX_KB_ID_LENGTH,
+  MAX_QUERY_LENGTH,
+  TOKEN_MASK_LENGTH,
+} from './constants.js';
 
 export function validateToken(token: string | null | undefined): boolean {
   if (token == null || typeof token !== 'string') return false;
@@ -35,12 +41,70 @@ export function validateQuery(query: string): void {
   if (q.length > MAX_QUERY_LENGTH) throw new Error(`query exceeds maximum length of ${MAX_QUERY_LENGTH}`);
 }
 
-export function sanitizeErrorMessage(errorText: string): string {
-  if (errorText.includes('HTTP error') || errorText.toLowerCase().includes('status'))
-    return 'An error occurred while processing the request. Please try again.';
-  if (errorText.length > 500) return errorText.slice(0, 500) + '...';
+export type HttpErrorContext = {
+  kbId?: string;
+  fileId?: string;
+  operation?: 'search' | 'file' | 'info';
+};
 
-  return errorText;
+function truncateErrorMessage(message: string): string {
+  if (message.length > MAX_ERROR_MESSAGE_LENGTH) return message.slice(0, MAX_ERROR_MESSAGE_LENGTH) + '...';
+
+  return message;
+}
+
+export async function parseApiErrorDetail(res: Response): Promise<string | null> {
+  try {
+    const body = await res.text();
+    if (!body.trim()) return null;
+
+    try {
+      const parsed = JSON.parse(body) as unknown;
+      if (typeof parsed === 'string') return parsed;
+
+      if (parsed && typeof parsed === 'object' && 'detail' in parsed) {
+        const detail = (parsed as { detail: unknown }).detail;
+        if (typeof detail === 'string') return detail;
+
+        if (Array.isArray(detail)) {
+          return detail
+            .map((item) => {
+              if (item && typeof item === 'object' && 'msg' in item) return String((item as { msg: unknown }).msg);
+
+              return JSON.stringify(item);
+            })
+            .join('; ');
+        }
+        if (detail != null) return String(detail);
+      }
+    } catch {
+      // response body is not JSON
+    }
+
+    return truncateErrorMessage(body);
+  } catch {
+    return null;
+  }
+}
+
+export function formatHttpErrorMessage(status: number, detail: string, context?: HttpErrorContext): string {
+  if (context?.operation === 'search') {
+    return truncateErrorMessage(
+      `Semantic search failed (HTTP ${status}): ${detail}\n\n` +
+        'This often indicates an Open WebUI embedding or retrieval configuration issue. ' +
+        'Check Admin Settings → Documents / Embeddings in Open WebUI. ' +
+        'As a workaround, use get_knowledge_base_file_content with a file ID from get_knowledge_base_info.',
+    );
+  }
+
+  if (status === 404 && context?.fileId) return `File not found: ${context.fileId}`;
+  if (status === 404 && context?.kbId) return `Knowledge base not found: ${context.kbId}`;
+
+  return truncateErrorMessage(`Request failed (HTTP ${status}): ${detail}`);
+}
+
+export function sanitizeErrorMessage(errorText: string): string {
+  return truncateErrorMessage(`${errorText}. Check Open WebUI server logs for details.`);
 }
 
 export type ApiClient = {
@@ -77,12 +141,15 @@ export async function handleHttpError(
   res: Response,
   connectionId: string,
   cleanup: (id: string) => Promise<void>,
-  kbId?: string,
+  context?: HttpErrorContext,
 ): Promise<never> {
   if (res.status === 401) {
     await cleanup(connectionId);
     throw new Error('Authentication failed. Please check your API token.');
   }
-  if (res.status === 404 && kbId) throw new Error(`Knowledge base not found: ${kbId}`);
+
+  const detail = await parseApiErrorDetail(res);
+  if (detail) throw new Error(formatHttpErrorMessage(res.status, detail, context));
+
   throw new Error(sanitizeErrorMessage(`HTTP error ${res.status}: Request failed`));
 }

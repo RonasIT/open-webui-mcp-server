@@ -85,7 +85,7 @@ export async function searchKnowledgeBase(
     query,
     k,
   });
-  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup, kbId);
+  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup, { kbId, operation: 'search' });
   const result = (await res.json()) as {
     documents?: Array<Array<string>>;
     metadatas?: Array<Array<unknown>>;
@@ -120,7 +120,7 @@ export async function getKnowledgeBaseInfo(
   if (!kbId) throw new Error('knowledge_base_id is required');
   validateKnowledgeBaseId(kbId);
   const res = await client.get(`/knowledge/${kbId}`);
-  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup, kbId);
+  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup, { kbId, operation: 'info' });
   const kbData = (await res.json()) as Record<string, unknown>;
 
   try {
@@ -137,4 +137,27 @@ export async function getKnowledgeBaseInfo(
   }
 
   return [{ type: 'text', text: JSON.stringify(kbData, null, 2) }];
+}
+
+export type GetFileContentArgs = { file_id: string };
+
+export async function getKnowledgeBaseFileContent(
+  client: ApiClient,
+  args: GetFileContentArgs,
+  ctx: HttpErrorContext,
+): Promise<ToolContent> {
+  const fileId = args.file_id;
+  if (!fileId) throw new Error('file_id is required');
+  validateKnowledgeBaseId(fileId);
+  const res = await client.get(`/files/${fileId}/content`);
+  if (!res.ok) await handleHttpError(res, ctx.connectionId, ctx.cleanup, { fileId, operation: 'file' });
+  const contentType = res.headers.get('content-type') ?? 'text/plain';
+  const text = await res.text();
+
+  return [
+    {
+      type: 'text',
+      text: `File ID: ${fileId}\nContent-Type: ${contentType}\n\n${text}`,
+    },
+  ];
 }
